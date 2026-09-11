@@ -38,7 +38,7 @@ jobs:
   release:
     name: release
     needs: [guard-semver]
-    uses: guilhermelinosp/templates/.github/workflows/release.yml@9fe39322263723d320cdce780f00d5926059798a # main
+    uses: guilhermelinosp/templates/.github/workflows/release.yml@da82921830fafa7349cda3faef3310a3a4d86dda # main
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     permissions:
