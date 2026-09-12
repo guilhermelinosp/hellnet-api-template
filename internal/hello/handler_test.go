@@ -9,7 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/hellnet-lib-api/api"
+	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
 )
 
 // ───────────────────── Service unit tests (framework-free) ─────────────────
@@ -39,7 +40,7 @@ func TestServiceRejectsOverlongNames(t *testing.T) {
 	svc := NewService(slog.Default())
 	_, err := svc.Greet(context.Background(), strings.Repeat("x", 200))
 
-	var appErr *api.Error
+	var appErr *apierrors.Error
 	if !errors.As(err, &appErr) || appErr.Status != http.StatusBadRequest {
 		t.Fatalf("expected VALIDATION_ERROR 400, got %v", err)
 	}
@@ -56,7 +57,7 @@ type fakeRequest struct {
 func (f fakeRequest) Param(name string) string { return f.params[name] }
 func (f fakeRequest) Query(name string) string { return f.query[name] }
 func (f fakeRequest) Header(string) string     { return "" }
-func (f fakeRequest) Bind(v any) error         { return api.BindInto(strings.NewReader(f.body), v) }
+func (f fakeRequest) Bind(v any) error         { return api.BindJSON(strings.NewReader(f.body), v) }
 func (fakeRequest) Raw() *http.Request         { return nil }
 
 func TestHandlerHappyPaths(t *testing.T) {

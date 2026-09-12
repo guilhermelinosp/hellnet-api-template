@@ -1,27 +1,30 @@
 // Package main bootstraps the API.
 //
-// Deliberately tiny: it only wires explicit dependencies in lifecycle order
-// and owns the shutdown sequence. Every real decision lives inside packages:
+// Deliberately tiny: it wires explicit dependencies in lifecycle order and
+// owns the shutdown sequence. Nearly all real decisions live in
+// hellnet-lib-api (config, adapter, platform, server) and
+// hellnet-lib-telemetry; this file only composes them with the business
+// module (internal/hello).
 //
-//	context → config → telemetry → api adapter → http server → shutdown
+//	context → config → telemetry → platform app → routes → run → shutdown
 package main
 
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
-	"github.com/guilhermelinosp/golang-api-template/internal/api/ginadapter"
-	"github.com/guilhermelinosp/golang-api-template/internal/config"
+	"github.com/guilhermelinosp/hellnet-lib-api/api"
+	"github.com/guilhermelinosp/hellnet-lib-api/platform"
+	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
+
 	"github.com/guilhermelinosp/golang-api-template/internal/hello"
-	"github.com/guilhermelinosp/golang-api-template/internal/observability"
-	"github.com/guilhermelinosp/golang-api-template/internal/server"
 )
 
-// Build metadata injected via -ldflags (see Makefile, Containerfile, CI).
+// Build metadata injected via -ldflags (see .goreleaser.yaml, Containerfile).
 var (
 	version = "dev"
 	commit  = "unknown"
@@ -36,62 +39,52 @@ func main() {
 }
 
 func run() error {
-	// 1. Application context — created ONCE here; everything below inherits it
-	//    (telemetry uses it as the root for its internal spans/logs).
+	// 1. Application context — created ONCE here; server + telemetry inherit it
+	//    for graceful shutdown on SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// 2. Configuration (APP_*; telemetry envs stay with the library).
-	cfg, err := config.Load(config.Build{Version: version, Commit: commit, Date: date})
+	// 2. Telemetry — env-first, self-contained (HELLNET_TELEMETRY_* with
+	//    HELLNET_* fallback + .env in dev). Without HELLNET_TELEMETRY_ENDPOINT
+	//    the SDK boots in no-op mode so the template runs with zero config.
+	tel, err := telemetry.New()
+	if err != nil {
+		return err
+	}
+	logger := tel.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Info("starting",
+		slog.String("version", version),
+		slog.String("commit", commit),
+		slog.String("date", date),
+	)
+
+	// 3. Fully wired HTTP application from hellnet-lib-api: environment-driven
+	//    config (HELLNET_* with APP_* fallback) + gin adapter + telemetry
+	//    middleware + HTTP server with graceful shutdown.
+	app, err := platform.New(tel)
 	if err != nil {
 		return err
 	}
 
-	// 3. Telemetry — single integration point with hellnet-lib-telemetry.
-	tel, err := observability.Init(ctx, cfg)
-	if err != nil {
-		return err
-	}
-	logger := observability.Logger(tel)
-
-	// 4. Business dependencies (composition, no DI framework).
+	// 4. Business dependencies (composition, no DI framework). The template's
+	//    domain module only speaks hellnet-lib-api contracts.
 	helloHandler := hello.NewHandler(hello.NewService(logger))
 
-	// 5. HTTP boundary: Gin adapter + platform + business routes.
-	router := ginadapter.New(ginadapter.Config{
-		Logger:             logger,
-		ReleaseMode:        cfg.IsProduction(),
-		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
-		BodyLimit:          cfg.BodyLimit,
+	// 5. Mount platform probes (live/ready/health/metrics) + /api/v1 routes.
+	app.Register(api.Deps{
+		Platform: app.PlatformHandlers(),
+		Routes:   helloHandler.Routes(),
 	})
-	platform := observability.Platform(tel)
-	api.RegisterPlatform(router, api.ServiceInfo{
-		Name:    cfg.Name,
-		Version: cfg.Build.Version,
-		Commit:  cfg.Build.Commit,
-		BuiltAt: cfg.Build.Date,
-	}, api.Deps{
-		Platform: api.PlatformHandlers{
-			Live:   platform.Live,
-			Ready:  platform.Ready,
-			Health: platform.Health,
-		},
-		Routes: helloHandler.Routes(),
-	})
+	app.Router.Mount(http.MethodGet, "/metrics", tel.MetricsHandler())
 
-	// 6. Server owns the network; telemetry middleware is applied by the
-	//    library wrapper around the whole handler tree (logs/metrics/traces).
-	httpHandler := observability.RequestTelemetry(tel, router)
-
-	srv := server.New(cfg, logger, httpHandler)
-	if err := srv.Run(ctx); err != nil {
+	// 6. Serve until ctx is cancelled, then flush telemetry LAST so final
+	//    logs/traces/metrics still export.
+	if err := app.Run(ctx); err != nil {
 		logger.Error("runtime error", slog.Any("error", err))
 	}
-
-	// 7. Telemetry shuts down LAST so final logs/traces/metrics still flush.
 	logger.Info("shutting down: flushing telemetry")
-	if err := tel.Shutdown(); err != nil {
-		logger.Warn("telemetry shutdown reported errors", slog.Any("error", err))
-	}
-	return nil
+	return app.Shutdown()
 }
