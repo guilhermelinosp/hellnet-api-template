@@ -12,7 +12,6 @@ package main
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -78,12 +77,11 @@ func run() error {
 	//    domain module only speaks hellnet-lib-api contracts.
 	helloHandler := hello.NewHandler(hello.NewService(logger))
 
-	// 5. Mount platform probes (live/ready/health/metrics) + /api/v1 routes.
+	// 5. Mount platform probes (live/ready/health) + /api/v1 routes.
 	app.Register(api.Deps{
 		Platform: app.PlatformHandlers(),
 		Routes:   helloHandler.Routes(),
 	})
-	app.Router.Mount(http.MethodGet, "/metrics", tel.MetricsHandler())
 
 	// 6. Serve until ctx is cancelled, then flush telemetry LAST so final
 	//    logs/traces/metrics still export.
