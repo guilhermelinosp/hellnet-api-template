@@ -19,6 +19,7 @@ import (
 
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
 	"github.com/guilhermelinosp/hellnet-lib-api/platform"
+	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 
 	"github.com/guilhermelinosp/golang-api-template/internal/hello"
@@ -39,7 +40,11 @@ func main() {
 }
 
 func run() error {
-	// 1. Application context — created ONCE here; server + telemetry inherit it
+	// 1. Environment: dev convenience — loads .env if present, so the app
+	//    boots with zero configuration (idempotent; ignored outside dev).
+	_ = environments.LoadDotEnv()
+
+	// 2. Application context — created ONCE here; server + telemetry inherit it
 	//    for graceful shutdown on SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
