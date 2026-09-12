@@ -115,3 +115,4 @@ this template ships as a normal application (`v1.x.x`).
 [Apache 2.0](LICENSE)
 
 [Conventional Commits]: https://www.conventionalcommits.org/
+# auto-pr selftest
