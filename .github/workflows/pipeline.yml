@@ -2,7 +2,7 @@ name: pipeline
 
 # Library CI: cut a semver tag + GitHub Release on every code change to main
 # (changes limited to .github/ are ignored so CI edits never trigger a
-# release), then run the quality gate.
+# release), then run the quality gate and build a container image.
 
 on:
   push:
@@ -10,9 +10,6 @@ on:
     paths-ignore:
       - '.github/**'
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   guard-semver:
@@ -38,15 +35,26 @@ jobs:
   release:
     name: release
     needs: [guard-semver]
-    uses: guilhermelinosp/templates/.github/workflows/release.yml@da82921830fafa7349cda3faef3310a3a4d86dda # main
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     permissions:
       contents: write
+    uses: guilhermelinosp/templates/.github/workflows/release.yml@fde7d4a5a2e7aa5dd42e8812df4783daa39b1543 # main
 
   quality:
     name: quality
     needs: [release]
-    uses: guilhermelinosp/templates/.github/workflows/lib-quality.yml@da82921830fafa7349cda3faef3310a3a4d86dda # main
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: guilhermelinosp/templates/.github/workflows/lib-quality.yml@fde7d4a5a2e7aa5dd42e8812df4783daa39b1543 # main
     with:
       go-version-file: go.mod
+
+  image:
+    name: image
+    needs: [release, quality]
+    permissions:
+      contents: read
+      packages: write
+    uses: guilhermelinosp/templates/.github/workflows/buildah.yml@af2bcbe5d72882b5ab9145a02620d229dd14587f # main
+    with:
+      version: ${{ needs.release.outputs.version }}
