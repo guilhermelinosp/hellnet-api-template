@@ -8,7 +8,7 @@ package config
 
 import (
 	"fmt"
-	"os"
+	"github.com/guilhermelinosp/golang-api-template/internal/env"
 	"strconv"
 	"strings"
 	"time"
@@ -115,14 +115,14 @@ func (c *Config) Validate() error {
 func (c *Config) IsProduction() bool { return c.Env == envProduction }
 
 func str(key, def string) string {
-	if v := os.Getenv(key); v != "" {
+	if v := env.String(key, ""); v != "" {
 		return v
 	}
 	return def
 }
 
 func duration(key string, def time.Duration) (time.Duration, error) {
-	raw := os.Getenv(key)
+	raw := env.String(key, "")
 	if raw == "" {
 		return def, nil
 	}

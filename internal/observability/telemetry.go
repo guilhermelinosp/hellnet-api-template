@@ -15,9 +15,9 @@ package observability
 
 import (
 	"context"
+	"github.com/guilhermelinosp/golang-api-template/internal/env"
 	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 	"go.opentelemetry.io/otel/attribute"
@@ -54,7 +54,7 @@ func Init(ctx context.Context, cfg *config.Config) (*Telemetry, error) {
 		attribute.String("service.version", cfg.Build.Version))
 	opts.RedactSensitive = true
 
-	switch os.Getenv("HELLNET_TELEMETRY_ENABLED") {
+	switch env.String("HELLNET_TELEMETRY_ENABLED", "") {
 	case "true":
 		opts.Enabled = true
 	case "false":

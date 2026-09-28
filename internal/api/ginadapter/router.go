@@ -8,9 +8,9 @@
 package ginadapter
 
 import (
+	"github.com/guilhermelinosp/golang-api-template/internal/env"
 	"log/slog"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
@@ -53,7 +53,7 @@ func New(cfg Config) *Router {
 	switch {
 	case cfg.ReleaseMode:
 		gin.SetMode(gin.ReleaseMode)
-	case os.Getenv("GIN_MODE") == "":
+	case env.String("GIN_MODE", "") == "":
 		gin.SetMode(gin.DebugMode)
 		// else: GIN_MODE already set externally — leave it alone (tests)
 	}
