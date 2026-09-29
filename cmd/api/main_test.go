@@ -6,19 +6,19 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/hellnet-lib-api/api"
 )
 
-// TestRootDeclarations asserts the platform contract: the system endpoints
-// this template promises must exist as declared routes before any adapter
-// runs. The full HTTP behavior (through Gin) is covered by ginadapter tests;
-// here we only protect the composition invariants of main's wiring table.
+// TestPlatformEndpointPaths asserts the platform contract promised by
+// hellnet-lib-api: the system endpoints exist as declared route constants.
+// The actual mounting is covered by the library; here we only protect the
+// composition invariants of main's wiring table.
 func TestPlatformEndpointPaths(t *testing.T) {
 	want := []string{
 		api.PathLive,
 		api.PathReady,
 		api.PathHealth,
-		api.PathMetrics,
+		api.Prefix,
 	}
 	for _, path := range want {
 		if path == "" || path[0] != '/' {
