@@ -1,4 +1,4 @@
-module github.com/guilhermelinosp/golang-api-template
+module github.com/guilhermelinosp/hellnet-api-template
 
 go 1.27.0
 

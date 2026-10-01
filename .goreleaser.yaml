@@ -1,7 +1,7 @@
 ---
 version: 2
 
-project_name: golang-api-template
+project_name: hellnet-api-template
 
 before:
   hooks:
@@ -66,4 +66,4 @@ release:
   draft: false
   mode: replace-existing
   header: |
-    ## golang-api-template {{ .Version }}
+    ## hellnet-api-template {{ .Version }}

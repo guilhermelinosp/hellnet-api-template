@@ -1,11 +1,11 @@
-# golang-api-template
+# hellnet-api-template
 
 > Opinionated, production-ready GitHub template for Go HTTP APIs.
 > Built entirely on [hellnet-lib-api](https://github.com/guilhermelinosp/hellnet-lib-api) — you only write business logic.
 
-[![pipeline](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/pipeline.yml/badge.svg)](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/pipeline.yml)
-[![pr-check](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/pr-check.yml/badge.svg)](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/pr-check.yml)
-[![CodeQL](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/codeql.yml/badge.svg)](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/codeql.yml)
+[![pipeline](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pipeline.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pipeline.yml)
+[![pr-check](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pr-check.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pr-check.yml)
+[![CodeQL](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/codeql.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/codeql.yml)
 
 Three non-negotiable statements about this codebase:
 
@@ -80,7 +80,7 @@ curl -s 'localhost:8080/api/v1/hello?name=you'
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `HELLNET_APP_NAME` / `APP_NAME` | service name (also telemetry fallback) | `golang-api-template` |
+| `HELLNET_APP_NAME` / `APP_NAME` | service name (also telemetry fallback) | `hellnet-api-template` |
 | `HELLNET_APP_PORT` / `APP_PORT` | listen port | `8080` |
 | `HELLNET_TELEMETRY_ENDPOINT` / `HELLNET_ENDPOINT` | OTLP collector URL (no-op without it) | *empty* |
 | `HELLNET_TELEMETRY_SERVICE` / `HELLNET_SERVICE` | telemetry service name | app name |

@@ -21,7 +21,7 @@ import (
 	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/hello"
+	"github.com/guilhermelinosp/hellnet-api-template/internal/hello"
 )
 
 // Build metadata injected via -ldflags (see .goreleaser.yaml, Containerfile).
