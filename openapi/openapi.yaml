@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: golang-api-template
+  title: hellnet-api-template
   description: |
     Opinionated production-ready Go API template.
 
