@@ -3,10 +3,6 @@
 > Opinionated, production-ready GitHub template for Go HTTP APIs.
 > Built entirely on [hellnet-lib-api](https://github.com/guilhermelinosp/hellnet-lib-api) — you only write business logic.
 
-[![pipeline](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pipeline.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pipeline.yml)
-[![pr-check](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pr-check.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pr-check.yml)
-[![CodeQL](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/codeql.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/codeql.yml)
-
 Three non-negotiable statements about this codebase:
 
 ```text
@@ -16,6 +12,10 @@ hellnet-lib-telemetry is the standard observability layer.
 ```
 
 ---
+
+[![pipeline](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pipeline.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pipeline.yml)
+[![pr-check](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pr-check.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/pr-check.yml)
+[![CodeQL](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/codeql.yml/badge.svg)](https://github.com/guilhermelinosp/hellnet-api-template/actions/workflows/codeql.yml)
 
 ## What you get for free
 
@@ -36,24 +36,6 @@ All infrastructure comes from two libraries — nothing is reimplemented here:
 
 Your 20% is `internal/hello/` — the reference business module demonstrating how to write domain logic on top of the library contracts.
 
----
-
-## Architecture
-
-```
-cmd/api/main.go       ← wiring only (4 steps: ctx → telemetry → platform → routes)
-internal/hello/        ← your domain (handler + service, transport-agnostic)
-```
-
-**`cmd/api/main.go` is intentionally tiny:**
-
-1. Create application context (signal-aware)
-2. Boot telemetry (`HELLNET_TELEMETRY_*` envs — runs in no-op mode without `ENDPOINT`)
-3. Create fully-wired HTTP app (`platform.New(tel)`: config + gin + middleware + server)
-4. Mount business routes + serve until SIGINT/SIGTERM
-
----
-
 ## Initialize from this template
 
 After **Use this template**, clone the new repository and run:
@@ -69,18 +51,13 @@ Then create the `HELLNET_ACTIONS_PRIVATE_KEY` secret (the script prints the exac
 ## Quick start
 
 ```bash
-# 1. Create your repo from this template, then:
-git clone https://github.com/<you>/my-project && cd my-project
-go mod edit -module github.com/<you>/my-project
-go mod tidy
+# 1. Initialise the repository first (see above); optionally replace internal/hello with your own module,
+#    keeping the same shape: Handler + Service using hellnet-lib-api/api contracts.
 
-# 2. Rename the domain (optional): replace internal/hello with your own module.
-#    Keep the same shape: Handler + Service using hellnet-lib-api/api contracts.
-
-# 3. Run:
+# 2. Run:
 go run ./cmd/api/
 
-# 4. Verify:
+# 3. Verify:
 curl -s localhost:8080/live
 curl -s localhost:8080/ready
 curl -s localhost:8080/health
@@ -88,7 +65,7 @@ curl -s localhost:8080/metrics
 curl -s 'localhost:8080/api/v1/hello?name=you'
 ```
 
-### Environment variables
+## Configuration
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -98,32 +75,50 @@ curl -s 'localhost:8080/api/v1/hello?name=you'
 | `HELLNET_TELEMETRY_SERVICE` / `HELLNET_SERVICE` | telemetry service name | app name |
 | `HELLNET_ENVIRONMENT` / `APP_ENV` | `development` / `production` | `development` |
 
----
+## Architecture
 
-## Develop
-
-```bash
-go test ./...                    # all tests (unit only)
-go test -race ./...              # race detector
-go vet ./...                     # static analysis
-golangci-lint run                # linter
+```
+cmd/api/main.go       ← wiring only (4 steps: ctx → telemetry → platform → routes)
+internal/hello/        ← your domain (handler + service, transport-agnostic)
 ```
 
-Install git hooks once:
+**`cmd/api/main.go` is intentionally tiny:**
+
+1. Create application context (signal-aware)
+2. Boot telemetry (`HELLNET_TELEMETRY_*` envs — runs in no-op mode without `ENDPOINT`)
+3. Create fully-wired HTTP app (`platform.New(tel)`: config + gin + middleware + server)
+4. Mount business routes + serve until SIGINT/SIGTERM
+
+## Development
 
 ```bash
-lefthook install
+go test -race ./...
+go vet ./...
+golangci-lint run ./...
 ```
 
----
+Install the git hooks once with `lefthook install`: they run formatting, vet, tests (with and without `-race`), build, `go mod tidy`, lint, `govulncheck` and a secrets scan. Commits follow [Conventional Commits](https://www.conventionalcommits.org/).
+
+## CI/CD
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `pr-check` | pull request | shellcheck, merge strategy and Conventional Commits (`merge-check`), Gitleaks, labels and the Go quality gate (module integrity, vet, race tests with coverage, lint, build, dependency review). `pr-gate` aggregates them and is the required check |
+| `pipeline` | push to `main` (ignores `.github/**`) or manual | semver guard (blocks an automatic major), immutable tag + GitHub Release, container image |
+| `codeql` | nightly or manual | static analysis (CodeQL) |
+| `security` | nightly or manual | Gitleaks and Trivy scans |
+| `auto-pr` | push to `feat/**` or `fix/**` | opens the pull request automatically |
+| `dependabot-actions-auto-merge` | Dependabot pull requests | auto-merges GitHub Actions bumps |
+
+The workflows call reusable workflows from [templates](https://github.com/guilhermelinosp/templates), pinned by commit SHA. Releases need the `HELLNET_ACTIONS_PRIVATE_KEY` secret and the `HELLNET_ACTIONS_CLIENT_ID` variable (set them with `scripts/setup-repo.sh`).
 
 ## Versioning
 
 Releases follow [Conventional Commits]. Hellnet libraries stay on **v1**;
 this template ships as a normal application (`v1.x.x`).
 
-## License
+## Contributing and license
 
-[Apache 2.0](LICENSE)
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Licensed under [Apache 2.0](LICENSE).
 
 [Conventional Commits]: https://www.conventionalcommits.org/
