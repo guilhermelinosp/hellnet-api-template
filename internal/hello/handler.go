@@ -1,18 +1,18 @@
 package hello
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
-	"github.com/guilhermelinosp/hellnet-lib-api/api"
-	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
+	"github.com/gin-gonic/gin"
+	"github.com/guilhermelinosp/fast-platform/platform"
 )
 
-// Handler exposes the greeting endpoints. It implements the transport-neutral
-// api.Handler contract; registering it happens through plain Route values:
-//
-//	for _, r := range handler.Routes() { ... }
+// maxBodyBytes bounds the JSON body of POST /hello.
+const maxBodyBytes = 1 << 20
+
+// Handler exposes the greeting endpoints on a gin router.
 type Handler struct {
 	service Service
 }
@@ -22,15 +22,13 @@ func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
-// Routes declares this module's contribution to /api/v1.
+// Register mounts this module's routes (usually on the /api/v1 group).
 // Three flavors on purpose — they document every input style a typical
-// endpoint needs: query string, path wildcard and JSON body.
-func (h *Handler) Routes() []api.Route {
-	return []api.Route{
-		{Method: http.MethodGet, Path: "/hello", Handler: api.HandlerFunc(h.greetByQuery)},
-		{Method: http.MethodGet, Path: "/hello/{name}", Handler: api.HandlerFunc(h.greetByPath)},
-		{Method: http.MethodPost, Path: "/hello", Handler: api.HandlerFunc(h.greetByBody)},
-	}
+// endpoint needs: query string, path parameter and JSON body.
+func (h *Handler) Register(r gin.IRouter) {
+	r.GET("/hello", h.greetByQuery)
+	r.GET("/hello/:name", h.greetByPath)
+	r.POST("/hello", h.greetByBody)
 }
 
 // greetResponse is the wire shape of a successful greeting.
@@ -38,47 +36,48 @@ type greetResponse struct {
 	Message string `json:"message"`
 }
 
-func (h *Handler) greetByQuery(ctx context.Context, req api.Request) (api.Response, error) {
-	name := normalize(req.Query("name"))
-	msg, err := h.service.Greet(ctx, name)
-	if err != nil {
-		return api.Response{}, err
-	}
-	return api.JSON(http.StatusOK, greetResponse{Message: msg}), nil
+func (h *Handler) greetByQuery(c *gin.Context) {
+	h.respond(c, http.StatusOK, normalize(c.Query("name")))
 }
 
-func (h *Handler) greetByPath(ctx context.Context, req api.Request) (api.Response, error) {
-	name := normalize(req.Param("name"))
+func (h *Handler) greetByPath(c *gin.Context) {
+	name := normalize(c.Param("name"))
 	if name == "" {
-		return api.Response{}, apierrors.Validation("name", "path parameter is required")
+		platform.AbortError(c, platform.ValidationError("name", "path parameter is required"))
+		return
 	}
-	msg, err := h.service.Greet(ctx, name)
-	if err != nil {
-		return api.Response{}, err
-	}
-	return api.JSON(http.StatusOK, greetResponse{Message: msg}), nil
+	h.respond(c, http.StatusOK, name)
 }
 
-// greetRequest is the strict body contract for POST /hello. Unknown fields
-// are rejected by the abstraction (typo-proof API by default).
+// greetRequest is the strict body contract for POST /hello: unknown fields are
+// rejected (typo-proof API by default).
 type greetRequest struct {
 	Name string `json:"name"`
 }
 
-func (h *Handler) greetByBody(ctx context.Context, req api.Request) (api.Response, error) {
+func (h *Handler) greetByBody(c *gin.Context) {
 	var in greetRequest
-	if err := req.Bind(&in); err != nil {
-		return api.Response{}, err // already a 400/413-class application error
+	dec := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, maxBodyBytes))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		platform.AbortError(c, platform.ValidationError("body", "must be a valid JSON object with only the documented fields"))
+		return
 	}
 	name := normalize(in.Name)
 	if name == "" {
-		return api.Response{}, apierrors.Validation("name", "is required")
+		platform.AbortError(c, platform.ValidationError("name", "is required"))
+		return
 	}
-	msg, err := h.service.Greet(ctx, name)
+	h.respond(c, http.StatusCreated, name)
+}
+
+func (h *Handler) respond(c *gin.Context, status int, name string) {
+	msg, err := h.service.Greet(c.Request.Context(), name)
 	if err != nil {
-		return api.Response{}, err
+		platform.AbortError(c, err)
+		return
 	}
-	return api.JSON(http.StatusCreated, greetResponse{Message: msg}), nil
+	c.JSON(status, greetResponse{Message: msg})
 }
 
 func normalize(name string) string { return strings.TrimSpace(name) }

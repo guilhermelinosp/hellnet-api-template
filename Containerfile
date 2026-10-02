@@ -29,7 +29,7 @@ FROM gcr.io/distroless/static:nonroot
 
 COPY --from=builder /bin/api /api
 
-# Platform endpoints: /live /ready /health /metrics on the same port.
+# Platform endpoints: /live /ready /health on the same port.
 EXPOSE 8080
 
 USER 65532:65532

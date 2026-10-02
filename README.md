@@ -1,13 +1,14 @@
 # hellnet-api-template
 
 > Opinionated, production-ready GitHub template for Go HTTP APIs.
-> Built entirely on [hellnet-lib-api](https://github.com/guilhermelinosp/hellnet-lib-api) — you only write business logic.
+> Built on [fast-platform](https://github.com/guilhermelinosp/fast-platform) (`platform` and `env`) and
+> [hellnet-lib-telemetry](https://github.com/guilhermelinosp/hellnet-lib-telemetry) — you only write business logic.
 
 Three non-negotiable statements about this codebase:
 
 ```text
-Gin is an implementation detail (hidden inside hellnet-lib-api).
-hellnet-lib-api provides config, routing, middleware, server and platform probes.
+fast-platform/platform provides config, router, middleware, server and the error envelope (Gin).
+fast-platform/env loads the dev .env and reads typed environment variables.
 hellnet-lib-telemetry is the standard observability layer.
 ```
 
@@ -23,13 +24,13 @@ All infrastructure comes from two libraries — nothing is reimplemented here:
 
 | Capability | Source |
 |---|---|
-| Env-first config (`HELLNET_*` + `APP_*` fallback, `.env` in dev) | [hellnet-lib-api/config](https://github.com/guilhermelinosp/hellnet-lib-api) |
-| HTTP routing, adapters, validation, error envelope | [hellnet-lib-api/api](https://github.com/guilhermelinosp/hellnet-lib-api) |
+| Env-first config (`HELLNET_*`, `.env` in dev) | [fast-platform/platform](https://github.com/guilhermelinosp/fast-platform) |
+| HTTP router (Gin), validation, error envelope | fast-platform/platform |
 | Structured logging (`slog`, JSON, trace-correlated) | [hellnet-lib-telemetry](https://github.com/guilhermelinosp/hellnet-lib-telemetry) |
-| Distributed tracing + metrics (`/metrics` Prometheus) | hellnet-lib-telemetry |
-| `/live` `/ready` `/health` platform probes | hellnet-lib-api/platform (via telemetry) |
-| Graceful shutdown with correct telemetry flush order | hellnet-lib-api/platform |
-| Secure timeouts, request-id, security headers, CORS | hellnet-lib-api/adapter |
+| Distributed tracing + metrics (exported over OTLP) | hellnet-lib-telemetry |
+| `/live` `/ready` `/health` platform probes | hellnet-lib-telemetry |
+| Graceful shutdown with correct telemetry flush order | fast-platform/platform |
+| Secure timeouts, request-id, security headers, CORS | fast-platform/platform |
 | CI: lint/CodeQL/dependency-review/govulncheck | `.github/workflows` |
 | Release: semver tag → GH release → GoReleaser → image | org reusable workflows + GoReleaser |
 | Container (distroless, non-root, reproducible) | `Containerfile` |
@@ -52,7 +53,7 @@ Then create the `HELLNET_ACTIONS_PRIVATE_KEY` secret (the script prints the exac
 
 ```bash
 # 1. Initialise the repository first (see above); optionally replace internal/hello with your own module,
-#    keeping the same shape: Handler + Service using hellnet-lib-api/api contracts.
+#    keeping the same shape: Handler (gin) + Service.
 
 # 2. Run:
 go run ./cmd/api/
@@ -61,7 +62,6 @@ go run ./cmd/api/
 curl -s localhost:8080/live
 curl -s localhost:8080/ready
 curl -s localhost:8080/health
-curl -s localhost:8080/metrics
 curl -s 'localhost:8080/api/v1/hello?name=you'
 ```
 
@@ -69,25 +69,26 @@ curl -s 'localhost:8080/api/v1/hello?name=you'
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `HELLNET_APP_NAME` / `APP_NAME` | service name (also telemetry fallback) | `hellnet-api-template` |
-| `HELLNET_APP_PORT` / `APP_PORT` | listen port | `8080` |
-| `HELLNET_TELEMETRY_ENDPOINT` / `HELLNET_ENDPOINT` | OTLP collector URL (no-op without it) | *empty* |
-| `HELLNET_TELEMETRY_SERVICE` / `HELLNET_SERVICE` | telemetry service name | app name |
-| `HELLNET_ENVIRONMENT` / `APP_ENV` | `development` / `production` | `development` |
+| `HELLNET_SERVICE` | service name (also the telemetry service name) | `hellnet-api-template` |
+| `HELLNET_PORT` | listen port | `8080` |
+| `HELLNET_ENVIRONMENT` | `Development` (gin debug) or any other value (release) | `Development` |
+| `HELLNET_TELEMETRY_ENDPOINT` | OTLP collector URL (no-op without it) | *empty* |
+| `SHUTDOWN_TIMEOUT`, `READ_TIMEOUT`, `WRITE_TIMEOUT`, `IDLE_TIMEOUT`, `READ_HEADER_TIMEOUT` | server timeouts (Go durations) | `10s`, `15s`, `30s`, `120s`, `10s` |
+| `BODY_LIMIT`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXIES` | request body size (bytes), comma-separated origins and proxies | `1048576`, *none*, *none* |
 
 ## Architecture
 
 ```
-cmd/api/main.go       ← wiring only (4 steps: ctx → telemetry → platform → routes)
-internal/hello/        ← your domain (handler + service, transport-agnostic)
+cmd/api/main.go       ← wiring only (ctx → config → telemetry → router → routes → run)
+internal/hello/        ← your domain (gin handler + service)
 ```
 
 **`cmd/api/main.go` is intentionally tiny:**
 
-1. Create application context (signal-aware)
+1. Create the process context (`platform.Context()`: signal-aware, loads the dev `.env`)
 2. Boot telemetry (`HELLNET_TELEMETRY_*` envs — runs in no-op mode without `ENDPOINT`)
-3. Create fully-wired HTTP app (`platform.New(tel)`: config + gin + middleware + server)
-4. Mount business routes + serve until SIGINT/SIGTERM
+3. Build the router (`platform.NewRouter`: gin + middleware) and mount the probes and business routes
+4. Serve until SIGINT/SIGTERM (`platform.Run`: graceful shutdown), then flush telemetry
 
 ## Development
 
