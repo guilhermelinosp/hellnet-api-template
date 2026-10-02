@@ -6,11 +6,12 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/guilhermelinosp/hellnet-lib-api/api"
-	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
+	"github.com/gin-gonic/gin"
+	"github.com/guilhermelinosp/fast-platform/platform"
 )
 
 // ───────────────────── Service unit tests (framework-free) ─────────────────
@@ -40,95 +41,102 @@ func TestServiceRejectsOverlongNames(t *testing.T) {
 	svc := NewService(slog.Default())
 	_, err := svc.Greet(context.Background(), strings.Repeat("x", 200))
 
-	var appErr *apierrors.Error
-	if !errors.As(err, &appErr) || appErr.Status != http.StatusBadRequest {
+	var httpErr *platform.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.Status != http.StatusBadRequest {
 		t.Fatalf("expected VALIDATION_ERROR 400, got %v", err)
 	}
 }
 
-// ────────────────── Handler tests against the abstraction port ─────────────
+// ─────────────────── Handler tests through a real gin router ───────────────
 
-type fakeRequest struct {
-	params map[string]string
-	query  map[string]string
-	body   string
+func newRouter(svc Service) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	NewHandler(svc).Register(router.Group("/api/v1"))
+	return router
 }
 
-func (f fakeRequest) Param(name string) string { return f.params[name] }
-func (f fakeRequest) Query(name string) string { return f.query[name] }
-func (f fakeRequest) Header(string) string     { return "" }
-func (f fakeRequest) Bind(v any) error         { return api.BindJSON(strings.NewReader(f.body), v) }
-func (fakeRequest) Raw() *http.Request         { return nil }
+func do(router http.Handler, method, target, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, target, strings.NewReader(body))
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+func assertGreeting(t *testing.T, rec *httptest.ResponseRecorder, wantStatus int, wantMsg string) {
+	t.Helper()
+	if rec.Code != wantStatus {
+		t.Fatalf("status %d ≠ %d (body %s)", rec.Code, wantStatus, rec.Body.String())
+	}
+	var out greetResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("response is not the greeting JSON: %v (%s)", err, rec.Body.String())
+	}
+	if out.Message != wantMsg {
+		t.Fatalf("message %q ≠ %q", out.Message, wantMsg)
+	}
+}
 
 func TestHandlerHappyPaths(t *testing.T) {
-	h := NewHandler(&stubService{message: "Hello, x!"})
+	router := newRouter(&stubService{message: "Hello, x!"})
 
 	t.Run("query", func(t *testing.T) {
-		resp, err := h.greetByQuery(context.Background(), fakeRequest{query: map[string]string{"name": "world"}})
-		assertGreeting(t, resp, err, http.StatusOK, "Hello, x!")
+		assertGreeting(t, do(router, http.MethodGet, "/api/v1/hello?name=world", ""), http.StatusOK, "Hello, x!")
 	})
 	t.Run("path", func(t *testing.T) {
-		resp, err := h.greetByPath(context.Background(), fakeRequest{params: map[string]string{"name": "gin"}})
-		assertGreeting(t, resp, err, http.StatusOK, "Hello, x!")
+		assertGreeting(t, do(router, http.MethodGet, "/api/v1/hello/gin", ""), http.StatusOK, "Hello, x!")
 	})
 	t.Run("body", func(t *testing.T) {
-		resp, err := h.greetByBody(context.Background(), fakeRequest{body: `{"name":"ana"}`})
-		assertGreeting(t, resp, err, http.StatusCreated, "Hello, x!")
+		assertGreeting(t, do(router, http.MethodPost, "/api/v1/hello", `{"name":"ana"}`), http.StatusCreated, "Hello, x!")
 	})
 }
 
 func TestHandlerInputFailures(t *testing.T) {
-	h := NewHandler(&stubService{message: "unused"})
+	router := newRouter(&stubService{message: "unused"})
 
-	if _, err := h.greetByPath(context.Background(), fakeRequest{}); err == nil {
-		t.Fatal("empty path name must be a validation error")
+	cases := map[string]struct{ method, target, body string }{
+		"blank path name":       {http.MethodGet, "/api/v1/hello/%20", ""},
+		"empty body name":       {http.MethodPost, "/api/v1/hello", `{}`},
+		"malformed body":        {http.MethodPost, "/api/v1/hello", `not-json`},
+		"unknown body field":    {http.MethodPost, "/api/v1/hello", `{"name":"a","extra":1}`},
+		"wrong body field type": {http.MethodPost, "/api/v1/hello", `{"name":1}`},
 	}
-	if _, err := h.greetByBody(context.Background(), fakeRequest{body: `{}`}); err == nil {
-		t.Fatal("empty body name must be a validation error")
-	}
-	if _, err := h.greetByBody(context.Background(), fakeRequest{body: `not-json`}); err == nil {
-		t.Fatal("malformed body must surface an error")
-	}
-	if _, err := h.greetByBody(context.Background(), fakeRequest{body: `{"name":"a","extra":1}`}); err == nil {
-		t.Fatal("unknown fields are rejected by contract")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			rec := do(router, tc.method, tc.target, tc.body)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status %d, want 400 (body %s)", rec.Code, rec.Body.String())
+			}
+			var env struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil || env.Error.Code != "VALIDATION_ERROR" {
+				t.Fatalf("want the VALIDATION_ERROR envelope, got %s", rec.Body.String())
+			}
+		})
 	}
 }
 
-func TestRoutesDeclaration(t *testing.T) {
-	routes := NewHandler(&stubService{}).Routes()
-	want := map[string]bool{
-		"GET /hello":     false,
-		"GET /hello/{n}": false,
-		"POST /hello":    false,
+func TestHandlerMapsServiceErrors(t *testing.T) {
+	router := newRouter(&stubService{err: platform.ValidationError("name", "is invalid")})
+	if rec := do(router, http.MethodGet, "/api/v1/hello?name=x", ""); rec.Code != http.StatusBadRequest {
+		t.Fatalf("service validation error must be a 400, got %d", rec.Code)
 	}
-	for _, r := range routes {
-		key := r.Method + " /hello"
-		if _, ok := want[key]; ok {
-			delete(want, key)
+}
+
+func TestRoutesAreMounted(t *testing.T) {
+	routes := map[string]bool{}
+	for _, r := range newRouter(&stubService{}).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+	for _, want := range []string{"GET /api/v1/hello", "GET /api/v1/hello/:name", "POST /api/v1/hello"} {
+		if !routes[want] {
+			t.Errorf("route %q is not mounted (have %v)", want, routes)
 		}
-	}
-	if len(want) > 1 { // wildcard key differs; ensure all three flavors present
-		t.Fatalf("route flavors missing: %v", routes)
-	}
-}
-
-func assertGreeting(t *testing.T, resp api.Response, err error, wantStatus int, wantMsg string) {
-	t.Helper()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.Status != wantStatus {
-		t.Fatalf("status %d ≠ %d", resp.Status, wantStatus)
-	}
-	raw, mErr := json.Marshal(resp.Body)
-	if mErr != nil {
-		t.Fatalf("marshal: %v", mErr)
-	}
-	var out greetResponse
-	if json.Unmarshal(raw, &out); &out == nil {
-		t.Fatal("nil payload")
-	}
-	if out.Message != wantMsg {
-		t.Fatalf("message %q ≠ %q", out.Message, wantMsg)
 	}
 }
