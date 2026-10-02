@@ -4,8 +4,8 @@ go 1.27.0
 
 require (
 	github.com/guilhermelinosp/hellnet-lib-api v1.14.3
-	github.com/guilhermelinosp/hellnet-lib-environments v1.1.24
 	github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.5
+	github.com/joho/godotenv v1.5.1
 )
 
 require (
@@ -31,7 +31,7 @@ require (
 	github.com/grafana/pyroscope-go v1.4.2 // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.11 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/guilhermelinosp/hellnet-lib-environments v1.1.24 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect

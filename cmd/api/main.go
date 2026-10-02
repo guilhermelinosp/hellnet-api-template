@@ -14,12 +14,13 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
 	"github.com/guilhermelinosp/hellnet-lib-api/platform"
-	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
+	"github.com/joho/godotenv"
 
 	"github.com/guilhermelinosp/hellnet-api-template/internal/hello"
 )
@@ -41,7 +42,7 @@ func main() {
 func run() error {
 	// 1. Environment: dev convenience — loads .env if present, so the app
 	//    boots with zero configuration (idempotent; ignored outside dev).
-	_ = environments.LoadDotEnv()
+	loadDotEnv()
 
 	// 2. Application context — created ONCE here; server + telemetry inherit it
 	//    for graceful shutdown on SIGINT/SIGTERM.
@@ -90,4 +91,15 @@ func run() error {
 	}
 	logger.Info("shutting down: flushing telemetry")
 	return app.Shutdown()
+}
+
+// loadDotEnv loads ./.env in development environments only (HELLNET_ENVIRONMENT
+// is Development, Dev, Local, Test or Testing, case-insensitive); in any other
+// environment, such as production, it does nothing. A missing file is not an
+// error, and variables already set in the process win over the file.
+func loadDotEnv() {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("HELLNET_ENVIRONMENT"))) {
+	case "development", "dev", "local", "test", "testing":
+		_ = godotenv.Load()
+	}
 }
