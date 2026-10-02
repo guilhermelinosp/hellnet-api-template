@@ -3,9 +3,9 @@ module github.com/guilhermelinosp/hellnet-api-template
 go 1.27.0
 
 require (
-	github.com/guilhermelinosp/hellnet-lib-api v1.14.2
-	github.com/guilhermelinosp/hellnet-lib-environments v1.1.22
-	github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.2
+	github.com/guilhermelinosp/hellnet-lib-api v1.14.3
+	github.com/guilhermelinosp/hellnet-lib-environments v1.1.24
+	github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.5
 )
 
 require (
