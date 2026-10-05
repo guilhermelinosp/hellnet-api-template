@@ -4,8 +4,8 @@ go 1.27.0
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/guilhermelinosp/fast-platform v1.11.1
-	github.com/guilhermelinosp/hellnet-lib-telemetry v1.14.2
+	github.com/guilhermelinosp/fast-platform v1.11.4
+	github.com/guilhermelinosp/hellnet-lib-telemetry v1.14.3
 )
 
 require (
