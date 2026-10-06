@@ -52,6 +52,8 @@ jobs:
     secrets: inherit
   deployment:
     name: deployment
+    # o proprio template nao e implantado; so os servicos criados a partir dele
+    if: ${{ !github.event.repository.is_template }}
     needs: [release, image]
     uses: guilhermelinosp/templates/.github/workflows/cd.yml@latest
     with:
