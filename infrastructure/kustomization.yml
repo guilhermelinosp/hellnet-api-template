@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fast
+resources:
+  - application.yml
+  - configmap.yml
+labels:
+  - pairs:
+      app.kubernetes.io/instance: hellnet-api-template
+    includeSelectors: false
+# A versao da imagem NAO fica no Git: o ArgoCD Image Updater (image-updater.yml) a mantem na Application.

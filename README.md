@@ -123,3 +123,14 @@ this template ships as a normal application (`v1.x.x`).
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Licensed under [Apache 2.0](LICENSE).
 
 [Conventional Commits]: https://www.conventionalcommits.org/
+
+## Deploy
+
+`infrastructure/` tem os manifests (Kustomize) e o `pipeline.yml` tem o job `deployment`, que chama o hub `tailscale.yml` do repositorio `templates` (OIDC) e sincroniza a Application no ArgoCD. Ao criar um servico a partir deste template, renomeie tudo de uma vez:
+
+```bash
+NOVO=meu-servico
+grep -rl 'hellnet-api-template' infrastructure .github/workflows/pipeline.yml | xargs sed -i "s/hellnet-api-template/$NOVO/g"
+```
+
+Depois registre o repositorio em `sourceRepos` do AppProject e a imagem no ImageUpdater (veja `infrastructure/README.md` no repositorio `templates`).

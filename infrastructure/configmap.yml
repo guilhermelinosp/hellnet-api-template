@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hellnet-api-template
+  namespace: fast
+data:
+  HELLNET_ENVIRONMENT: Development
+  HELLNET_PORT: "8080"
+  HELLNET_TELEMETRY_ENDPOINT: http://alloy.observability.svc.cluster.local:4318
