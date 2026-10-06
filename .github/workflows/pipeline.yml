@@ -38,9 +38,6 @@ jobs:
 
   release:
     uses: guilhermelinosp/templates/.github/workflows/release.yml@latest
-    with:
-      app-client-id: ${{ vars.HELLNET_ACTIONS_CLIENT_ID }}
-    secrets: inherit
   image:
     name: image
     needs: [release]
@@ -60,5 +57,3 @@ jobs:
     with:
       app: hellnet-api-template   # troque pelo nome do servico ao criar o repositorio a partir deste template
       version: ${{ needs.release.outputs.version }}
-      app-client-id: ${{ vars.HELLNET_ACTIONS_CLIENT_ID }}
-    secrets: inherit
