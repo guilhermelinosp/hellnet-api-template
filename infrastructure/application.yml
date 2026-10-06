@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hellnet-api-template
+  namespace: fast
+  labels:
+    app.kubernetes.io/instance: hellnet-api-template
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: hellnet-api-template
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: hellnet-api-template
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: hellnet-api-template
+          image: ghcr.io/guilhermelinosp/hellnet-api-template
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: hellnet-api-template
+          env:
+            - name: HELLNET_SERVICE
+              value: hellnet-api-template
+          resources:
+            requests:
+              cpu: 20m
+              memory: 48Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 10
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hellnet-api-template
+  namespace: fast
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: hellnet-api-template
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

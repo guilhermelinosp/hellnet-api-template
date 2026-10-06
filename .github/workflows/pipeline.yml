@@ -1,7 +1,7 @@
 name: pipeline
 
 # Library CI: cut a semver tag + GitHub Release on every code change to main
-# (changes limited to .github/ are ignored so CI edits never trigger a
+# (changes limited to .github/ and infrastructure/ are ignored so CI edits never trigger a
 # release), then run the quality gate and build a container image.
 
 on:
@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths-ignore:
       - '.github/**'
+      - 'infrastructure/**'
   workflow_dispatch:
 
 permissions:
@@ -48,4 +49,15 @@ jobs:
     uses: guilhermelinosp/templates/.github/workflows/buildah.yml@latest
     with:
       version: ${{ needs.release.outputs.version }}
+    secrets: inherit
+  deployment:
+    name: deployment
+    # o proprio template nao e implantado; so os servicos criados a partir dele
+    if: ${{ !github.event.repository.is_template }}
+    needs: [release, image]
+    uses: guilhermelinosp/templates/.github/workflows/cd.yml@latest
+    with:
+      app: hellnet-api-template   # troque pelo nome do servico ao criar o repositorio a partir deste template
+      version: ${{ needs.release.outputs.version }}
+      app-client-id: ${{ vars.HELLNET_ACTIONS_CLIENT_ID }}
     secrets: inherit
